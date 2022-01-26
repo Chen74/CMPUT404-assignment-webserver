@@ -35,51 +35,32 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        # print("Got a request of: %s\n" % self.data)
-        #self.request.sendall(bytearray("OK", 'utf-8'))
+        print("Got a request of: %s\n" % self.data)
+        self.request.sendall(bytearray("OK", 'utf-8'))
         header = self.data.decode().split("\n")
         info = header[0].split()
-        print('info: ', info)
         # print(header.split('\n'))
         file_path = './www'
-        print('初始地址：', file_path)
-
         # print(file_path)
         count = 0
         if info[0].upper() == "GET":
             file_path += info[1]
-            if file_path.endswith("/"):
-                print('有结尾：', file_path)
-                if os.path.isfile(file_path):
-                    if ".html" in file_path or ".css" in file_path:
-                        print('属于文件：', file_path)
-                        content = self.successful_200(file_path)
-                else:
-                    file_path += "index.html"
-                    print('不属于文件：', file_path)
-
-                    content = self.successful_200(file_path)
-
+            print(file_path)
+            if os.path.isfile(file_path):
+                mimetype = mimetypes.guess_type(file_path)
+                self.successful_200(file_path, mimetype)
             else:
-                # if file_path[-1] != "/" and "." not in file_path:
-                #     self.redirect_301(file_path)
-                # elif file_path.endswith("/") and "." in file_path:
-                #     self.not_found_404()
-                # else:
-                    # go deeper
-                    #file_path += info[1]
-                print('无结尾：', file_path)
-                if os.path.isfile(file_path):
-                    if ".html" in file_path or ".css" in file_path:
-                        print('属于文件：', file_path)
-                        content = self.successful_200(file_path)
-
+                if file_path.endswith("/"):
+                    # if ".html" in file_path or ".css" in file_path:
+                    print(file_path)
+                    file_path += "index.html"
+                    mimetype = mimetypes.guess_type(file_path)
+                    self.successful_200(file_path, mimetype)
                 else:
-                    file_path += "/index.html"
-                    print('不属于文件：', file_path)
-
-                    content = self.successful_200(file_path)
-
+                    print(file_path)
+                    file_path += "index.html"
+                    mimetype = mimetypes.guess_type(file_path)
+                    self.successful_200(file_path, mimetype)
 
             # path = os.path.realpath(os.getcwd() + "/www" + file_path)
 
@@ -88,13 +69,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
             #     if count < 0:
             #         self.not_found_404()
 
-            if ".css" in file_path:
-                file_type = "text/css"
-            elif ".html" in file_path:
-                file_type = "text/html"
-            response = "HTTP/1.1 200 OK\r\nContent-Type: %s; charset=UTF-8\r\n".format(file_type)
-            self.request.send(bytearray(response, 'utf-8'))
-            self.request.send(bytearray(content, 'utf-8'))
         else:
             self.not_allowed_405()
 
@@ -106,22 +80,15 @@ class MyWebServer(socketserver.BaseRequestHandler):
         info = "HTTP/1.1 405 Method Not Allowed\r\n"
         self.request.sendall(bytearray(info, 'utf-8'))
 
-    def successful_200(self, path):
-        #file_type = None
+    def successful_200(self, path, ftype):
+        info = "HTTP/1.1 200 OK\r\n"
+        # ftype = str(self.type_check(path))
+        content_type = "Content-Type: " + str(ftype) + "; charset=UTF-8\r\n"
         file = open(path, 'r')
         content = file.read()
         file.close()
-        # if ".css" in path:
-        #     file_type = "text/css"
-        # elif ".html" in path:
-        #     file_type = "text/html"
-        # print(file_type)
-        # #ftype = str(self.type_check(path))
-        # info = "HTTP/1.1 200 OK\r\nContent-Type: %s; charset=UTF-8\r\n".format(file_type)
-        #
-        # response = info
-        # print('输出：', path)
-        return content
+        response = info + content_type + content
+        self.request.sendall(bytearray(response, 'utf-8'))
 
     def redirect_301(self, path):
         info = '301 Moved Permanently\r\n'
@@ -130,10 +97,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
         content_type = "Content-Type: " + ftype + "; charset=UTF-8\r\n"
         Date = "Date: %s\r\n".format(date.today().strftime("%d/%m/%Y"))
         response = info + location + content_type + Date
-        self.request.sendall(bytearray(response, 'utf-8'))
+        self.request.sendall(bytearray(response + open(path).read(), 'utf-8'))
 
     def type_check(self, path):
-        if ".css" in path:
+        if ".css" in path or ".plain" in path:
             file_type = "text/css"
             return file_type
         elif ".html" in path:
