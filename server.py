@@ -41,26 +41,35 @@ class MyWebServer(socketserver.BaseRequestHandler):
         info = header[0].split()
         # print(header.split('\n'))
         file_path = info[1]
-        print(file_path)
+        # print(file_path)
         count = 0
         if info[0].upper() == "GET":
             if file_path == "/":
-                if file_path.endswith("/") or file_path.endswith(""):
-                    file_path = "./www" + file_path + "index.html"
-                    if ".html" in file_path or ".css" in file_path:
-                        # mimetype = mimetypes.guess_type(file_path)
-                        self.successful_200(file_path)
+                if file_path.endswith("/"):
+                    file_path = "./www" + file_path
+                    # if ".html" in file_path or ".css" in file_path:
+                    print(file_path)
+                    if os.path.isfile(file_path):
+                        mimetype = mimetypes.guess_type(file_path)
+                        self.successful_200(file_path, mimetype)
                         print(file_path)
                     else:
-                        self.not_found_404()
-                else:
-                    self.not_found_404()
+                        file_path += "index.html"
+                        mimetype = mimetypes.guess_type(file_path)
+                        self.successful_200(file_path, mimetype)
             else:
-                if not (file_path[-1] == "/" and "." in file_path):
-                    # print(file_path)
-                    self.redirect_301(file_path)
+                if file_path[-1] != "/" and "." not in file_path:
+                    if os.path.isdir(file_path):
+                        self.redirect_301(file_path)
+                    return
+                    file_path += "index.html"
                 elif file_path.endswith("/") and "." in file_path:
                     self.not_found_404()
+                else:
+                    file_path = "./www" + file_path
+                    print(file_path)
+                    mimetype = mimetypes.guess_type(file_path)
+                    self.successful_200(file_path, mimetype)
 
             # path = os.path.realpath(os.getcwd() + "/www" + file_path)
 
@@ -80,10 +89,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
         info = "HTTP/1.1 405 Method Not Allowed\r\n"
         self.request.sendall(bytearray(info, 'utf-8'))
 
-    def successful_200(self, path):
+    def successful_200(self, path, ftype):
         info = "HTTP/1.1 200 OK\r\n"
-        ftype = str(self.type_check(path))
-        content_type = "Content-Type: " + ftype + "; charset=UTF-8\r\n"
+        # ftype = str(self.type_check(path))
+        content_type = "Content-Type: " + str(ftype) + "; charset=UTF-8\r\n"
         response = info + content_type
         self.request.sendall(bytearray(response + open(path).read(), 'utf-8'))
 
@@ -97,7 +106,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.request.sendall(bytearray(response + open(path).read(), 'utf-8'))
 
     def type_check(self, path):
-        if ".css" in path:
+        if ".css" in path or ".plain" in path:
             file_type = "text/css"
             return file_type
         elif ".html" in path:
@@ -119,3 +128,4 @@ if __name__ == "__main__":
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 # https://docs.python.org/2/library/os.path.html
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
+# https://stackoverflow.com/questions/22839278/python-built-in-server-not-loading-css
