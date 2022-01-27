@@ -3,7 +3,6 @@ import os.path
 import socketserver
 from datetime import datetime
 
-
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,6 +30,7 @@ from datetime import datetime
 from datetime import date
 
 
+# check if the method is "GET
 def correct_method(method):
     if method.upper() == "GET":
         return True
@@ -43,36 +43,38 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         headers = self.data.decode().split("\n")
+        # split the herder information to get the method and the file path
         info = headers[0].split()
         method = info[0]
-        count = 0
         if correct_method(method):
-            file_path = './www' + info[1]
-            print(4)
-            print(file_path)
-            if os.path.isfile(file_path):
-                filename = open(file_path, "r")
-                content = filename.read()
-                filename.close()
-                ftype = self.type_check(file_path)
-                self.ok_200(ftype)
-                self.request.sendall(bytearray(content, "utf-8"))
-                print(3)
+            file_path = "./www" + info[1]
+            if '../' not in file_path:
+                # raise 404 error if ".." in file path
+                if os.path.isdir(file_path):
+                    # check if the path is a directory, if it is, check if it ends with "/"
+                    if file_path.endswith("/"):
+                        file_path += "index.html"
+                    elif not file_path.endswith('/'):
+                        # redirect to proper path if the file path does not ends with "/"
+                        self.redirect_301()
+                        file_path += "/index.html"
+                    ftype = self.type_check(file_path)
+                    filename = open(file_path, "r")
+                    content = filename.read()
+                    filename.close()
+                    self.ok_200(ftype)
+                    self.request.sendall(bytearray(content, "utf-8"))
 
-            elif os.path.isdir(file_path):
-                if file_path.endswith("/"):
-                    file_path += "index.html"
-                    print("1")
+                # check if the path is a file
+                elif os.path.isfile(file_path):
+                    filename = open(file_path, "r")
+                    content = filename.read()
+                    filename.close()
+                    ftype = self.type_check(file_path)
+                    self.ok_200(ftype)
+                    self.request.sendall(bytearray(content, "utf-8"))
                 else:
-                    self.redirect_301(file_path)
-                    file_path += "/index.html"
-                print(2)
-                ftype = self.type_check(file_path)
-                filename = open(file_path, "r")
-                content = filename.read()
-                filename.close()
-                self.ok_200(ftype)
-                self.request.sendall(bytearray(content, "utf-8"))
+                    self.not_found_404()
             else:
                 self.not_found_404()
         else:
@@ -99,12 +101,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
         info = "HTTP/1.1 404 Not Found\r\n\r\n"
         self.request.sendall(bytearray(info, 'utf-8'))
 
-    def redirect_301(self, path):
-        info = '301 Moved Permanently\r\n'
-        location = "Location: %s\r\n".format(path)
+    def redirect_301(self):
+        info = 'HTTP/1.1 301 Moved Permanently\r\n'
         Date = f"Date: {datetime.now()}\r\n\r\n"
-        response = info + location + Date
-        self.request.sendall(bytearray(response + open(path).read(), 'utf-8'))
+        response = info + Date
+        self.request.sendall(bytearray(response, 'utf-8'))
 
 
 if __name__ == "__main__":
