@@ -1,6 +1,7 @@
 #  coding: utf-8
 import os.path
 import socketserver
+import errno
 from datetime import datetime
 
 # Copyright 2022 Abram Hindle, Eddie Antonio Santos, Chen Xu
@@ -63,7 +64,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     content = filename.read()
                     filename.close()
                     self.ok_200(ftype)
-                    self.request.sendall(bytearray(content, "utf-8"))
+                    try:
+                        self.request.sendall(bytearray(content, "utf-8"))
+                    except IOError as e:
+                        if e.errno == errno.EPIPE:
+                            pass
 
                 # check if the path is a file
                 elif os.path.isfile(file_path):
@@ -72,7 +77,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     filename.close()
                     ftype = self.type_check(file_path)
                     self.ok_200(ftype)
-                    self.request.sendall(bytearray(content, "utf-8"))
+                    try:
+                        self.request.sendall(bytearray(content, "utf-8"))
+                    except IOError as e:
+                        if e.errno == errno.EPIPE:
+                            pass
                 else:
                     self.not_found_404()
             else:
