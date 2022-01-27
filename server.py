@@ -1,8 +1,7 @@
 #  coding: utf-8
-import mimetypes
+import os.path
 import socketserver
-import os
-from datetime import date
+from datetime import datetime
 
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
@@ -29,116 +28,83 @@ from datetime import date
 # run: python freetests.py
 
 # try: curl -v -X GET http://127.0.0.1:8080/
+from datetime import date
+
+
+def correct_method(method):
+    if method.upper() == "GET":
+        return True
+    else:
+        return False
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
 
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        # print("Got a request of: %s\n" % self.data)
-        #self.request.sendall(bytearray("OK", 'utf-8'))
-        header = self.data.decode().split("\n")
-        info = header[0].split()
-        print('info: ', info)
-        # print(header.split('\n'))
-        file_path = './www'
-        print('初始地址：', file_path)
-
-        # print(file_path)
+        headers = self.data.decode().split("\n")
+        info = headers[0].split()
+        method = info[0]
         count = 0
-        if info[0].upper() == "GET":
-            file_path += info[1]
-            if file_path.endswith("/"):
-                print('有结尾：', file_path)
-                if os.path.isfile(file_path):
-                    if ".html" in file_path or ".css" in file_path:
-                        print('属于文件：', file_path)
-                        content = self.successful_200(file_path)
-                else:
+        if correct_method(method):
+            file_path = './www' + info[1]
+            print(4)
+            print(file_path)
+            if os.path.isfile(file_path):
+                filename = open(file_path, "r")
+                content = filename.read()
+                filename.close()
+                ftype = self.type_check(file_path)
+                self.ok_200(ftype)
+                self.request.sendall(bytearray(content, "utf-8"))
+                print(3)
+
+            elif os.path.isdir(file_path):
+                if file_path.endswith("/"):
                     file_path += "index.html"
-                    print('不属于文件：', file_path)
-
-                    content = self.successful_200(file_path)
-
-            else:
-                # if file_path[-1] != "/" and "." not in file_path:
-                #     self.redirect_301(file_path)
-                # elif file_path.endswith("/") and "." in file_path:
-                #     self.not_found_404()
-                # else:
-                    # go deeper
-                    #file_path += info[1]
-                print('无结尾：', file_path)
-                if os.path.isfile(file_path):
-                    if ".html" in file_path or ".css" in file_path:
-                        print('属于文件：', file_path)
-                        content = self.successful_200(file_path)
-
+                    print("1")
                 else:
+                    self.redirect_301(file_path)
                     file_path += "/index.html"
-                    print('不属于文件：', file_path)
-
-                    content = self.successful_200(file_path)
-
-
-            # path = os.path.realpath(os.getcwd() + "/www" + file_path)
-
-            # if ".." in "./www" + file_path:
-            #     count = count - 1
-            #     if count < 0:
-            #         self.not_found_404()
-
-            if ".css" in file_path:
-                file_type = "text/css"
-            elif ".html" in file_path:
-                file_type = "text/html"
-            response = "HTTP/1.1 200 OK\r\nContent-Type: %s; charset=UTF-8\r\n".format(file_type)
-            self.request.send(bytearray(response, 'utf-8'))
-            self.request.send(bytearray(content, 'utf-8'))
+                print(2)
+                ftype = self.type_check(file_path)
+                filename = open(file_path, "r")
+                content = filename.read()
+                filename.close()
+                self.ok_200(ftype)
+                self.request.sendall(bytearray(content, "utf-8"))
+            else:
+                self.not_found_404()
         else:
             self.not_allowed_405()
 
-    def not_found_404(self):
-        info = "HTTP/1.1 404 Not Found\r\n"
-        self.request.sendall(bytearray(info, 'utf-8'))
+    def type_check(self, path):
+        if ".css" in path:
+            return "text/css"
+        elif ".html" in path:
+            return "text/html"
+
+    def ok_200(self, ftype):
+        info = "HTTP/1.1 200 OK\r\n"
+        content_type = "Content-Type: " + ftype + "; charset=UTF-8\r\n"
+        Date = f"Date: {datetime.now()}\r\n\r\n"
+        response = info + content_type + Date
+        self.request.sendall(bytearray(response, 'utf-8'))
 
     def not_allowed_405(self):
-        info = "HTTP/1.1 405 Method Not Allowed\r\n"
+        info = "HTTP/1.1 405 Method Not Allowed\r\n\r\n"
         self.request.sendall(bytearray(info, 'utf-8'))
 
-    def successful_200(self, path):
-        #file_type = None
-        file = open(path, 'r')
-        content = file.read()
-        file.close()
-        # if ".css" in path:
-        #     file_type = "text/css"
-        # elif ".html" in path:
-        #     file_type = "text/html"
-        # print(file_type)
-        # #ftype = str(self.type_check(path))
-        # info = "HTTP/1.1 200 OK\r\nContent-Type: %s; charset=UTF-8\r\n".format(file_type)
-        #
-        # response = info
-        # print('输出：', path)
-        return content
+    def not_found_404(self):
+        info = "HTTP/1.1 404 Not Found\r\n\r\n"
+        self.request.sendall(bytearray(info, 'utf-8'))
 
     def redirect_301(self, path):
         info = '301 Moved Permanently\r\n'
         location = "Location: %s\r\n".format(path)
-        ftype = str(self.type_check(path))
-        content_type = "Content-Type: " + ftype + "; charset=UTF-8\r\n"
-        Date = "Date: %s\r\n".format(date.today().strftime("%d/%m/%Y"))
-        response = info + location + content_type + Date
-        self.request.sendall(bytearray(response, 'utf-8'))
-
-    def type_check(self, path):
-        if ".css" in path:
-            file_type = "text/css"
-            return file_type
-        elif ".html" in path:
-            file_type = "text/html"
-            return file_type
+        Date = f"Date: {datetime.now()}\r\n\r\n"
+        response = info + location + Date
+        self.request.sendall(bytearray(response + open(path).read(), 'utf-8'))
 
 
 if __name__ == "__main__":
@@ -151,8 +117,3 @@ if __name__ == "__main__":
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
     server.serve_forever()
-
-# https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-# https://docs.python.org/2/library/os.path.html
-# https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
-# https://stackoverflow.com/questions/22839278/python-built-in-server-not-loading-css
